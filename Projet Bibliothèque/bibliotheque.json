@@ -1,0 +1,18 @@
+{
+    "livres": [
+        {
+            "titre": "1984",
+            "auteur": "Georges Orwell",
+            "annee": 1949,
+            "disponible": true
+        }
+    ],
+    "utilisateurs": [
+        {
+            "nom": "MF",
+            "prenom": "Anton",
+            "identifiant": "1312",
+            "emprunts": []
+        }
+    ]
+}
