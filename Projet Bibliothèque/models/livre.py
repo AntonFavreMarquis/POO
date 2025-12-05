@@ -1,10 +1,32 @@
 class Livre:
-    def __init__(self, titre, auteur, isbn):
+    def __init__(self, titre, auteur, annee, disponible=True):
         self.titre = titre
         self.auteur = auteur
-        self.isbn = isbn
+        self.annee = annee
+        self.disponible = disponible
+
+    def emprunter(self):
+        if self.disponible:
+            self.disponible = False
+        else:
+            raise Exception("Livre déjà emprunté")
+
+    def rendre(self):
         self.disponible = True
 
-    def __str__(self):
-        etat = "✅ Disponible" if self.disponible else "❌ Emprunté"
-        return f"{self.titre} - {self.auteur} (ISBN: {self.isbn}) [{etat}]"
+    def to_dict(self):
+        return {
+            "titre": self.titre,
+            "auteur": self.auteur,
+            "annee": self.annee,
+            "disponible": self.disponible
+        }
+
+    @staticmethod
+    def from_dict(data):
+        return Livre(
+            titre=data["titre"],
+            auteur=data["auteur"],
+            annee=data["annee"],
+            disponible=data["disponible"]
+        )

@@ -11,11 +11,13 @@ class Utilisateur:
     def to_dict(self):
         return {
             "nom": self.nom,
+            "prenom": self.prenom,
+            "identifiant": self.identifiant,
             "emprunts": self.emprunts
         }
 
     @staticmethod
     def from_dict(data):
-        u = Utilisateur(data["nom"])
+        u = Utilisateur(data["nom"] ,data["prenom"] , data["identifiant"] )
         u.emprunts = data.get("emprunts", [])
         return u

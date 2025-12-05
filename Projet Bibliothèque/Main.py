@@ -1,5 +1,4 @@
-from interface.gui_modern import Application
+from interface.gui import InterfaceBibliotheque
 
 if __name__ == "__main__":
-    app = Application()
-    app.mainloop()
+    InterfaceBibliotheque()

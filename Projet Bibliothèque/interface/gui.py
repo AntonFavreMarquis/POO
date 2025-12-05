@@ -1,155 +1,264 @@
+# Interface complète avec gestion des livres ET des utilisateurs
+# Version moderne avec sidebar + persistance JSON + gestion utilisateurs (Option B)
+
 import tkinter as tk
 from tkinter import ttk, messagebox
-from services.bibliotheque import Bibliotheque
+import json
+import os
 from models.livre import Livre
 from models.user import Utilisateur
+from models.emprunt import Emprunt
+from services.bibliotheque import Bibliotheque
 
-class Application(tk.Tk):
+
+class InterfaceBibliotheque:
     def __init__(self):
-        super().__init__()
-        self.title("📚 Bibliothèque Python")
-        self.geometry("700x500")
-        self.resizable(False, False)
+        self.bib = Bibliotheque()
 
-        self.biblio = Bibliotheque("Bibliothèque Python")
+        self.root = tk.Tk()
+        self.root.title("📘 Bibliothèque Moderne")
+        self.root.geometry("1100x650")
+        self.root.configure(bg="#121212")
 
-        self.create_widgets()
+        self.configure_style()
+        self.create_layout()
 
-    def create_widgets(self):
-        # --- Onglets ---
-        tab_control = ttk.Notebook(self)
-        self.tab_livres = ttk.Frame(tab_control)
-        self.tab_utilisateurs = ttk.Frame(tab_control)
-        self.tab_emprunts = ttk.Frame(tab_control)
-        tab_control.add(self.tab_livres, text="Livres")
-        tab_control.add(self.tab_utilisateurs, text="Utilisateurs")
-        tab_control.add(self.tab_emprunts, text="Emprunts")
-        tab_control.pack(expand=1, fill="both")
+        self.refresh_livres()
+        self.refresh_users()
 
-        self.create_tab_livres()
-        self.create_tab_utilisateurs()
-        self.create_tab_emprunts()
+        self.root.mainloop()
 
-    # --- Onglet Livres ---
-    def create_tab_livres(self):
-        frame_ajout = ttk.LabelFrame(self.tab_livres, text="Ajouter un livre")
-        frame_ajout.pack(fill="x", padx=10, pady=10)
+    # ---------------------------------------------------------
+    # STYLE
+    # ---------------------------------------------------------
+    def configure_style(self):
+        style = ttk.Style()
+        style.theme_use("clam")
 
-        ttk.Label(frame_ajout, text="Titre:").grid(row=0, column=0, padx=5, pady=5)
-        ttk.Label(frame_ajout, text="Auteur:").grid(row=1, column=0, padx=5, pady=5)
-        ttk.Label(frame_ajout, text="ISBN:").grid(row=2, column=0, padx=5, pady=5)
+        style.configure(
+            "Treeview",
+            background="#1e1e1e",
+            foreground="white",
+            rowheight=28,
+            fieldbackground="#1e1e1e",
+            bordercolor="#1e1e1e",
+        )
+        style.map("Treeview", background=[("selected", "#3a7cfc")])
 
-        self.titre_entry = ttk.Entry(frame_ajout)
-        self.auteur_entry = ttk.Entry(frame_ajout)
-        self.isbn_entry = ttk.Entry(frame_ajout)
+        style.configure(
+            "Sidebar.TButton",
+            background="#2a2a2a",
+            foreground="white",
+            padding=10,
+            relief="flat",
+            font=("Segoe UI", 12),
+        )
+        style.map("Sidebar.TButton", background=[("active", "#3a3a3a")])
 
-        self.titre_entry.grid(row=0, column=1, padx=5, pady=5)
-        self.auteur_entry.grid(row=1, column=1, padx=5, pady=5)
-        self.isbn_entry.grid(row=2, column=1, padx=5, pady=5)
+    # ---------------------------------------------------------
+    # LAYOUT (SIDEBAR + TABLE ZONES)
+    # ---------------------------------------------------------
+    def create_layout(self):
+        sidebar = tk.Frame(self.root, bg="#1b1b1b", width=230)
+        sidebar.pack(side="left", fill="y")
 
-        ttk.Button(frame_ajout, text="Ajouter", command=self.ajouter_livre).grid(row=3, column=0, columnspan=2, pady=10)
+        tk.Label(
+            sidebar,
+            text="📘 BIBLIOTHÈQUE",
+            bg="#1b1b1b",
+            fg="white",
+            font=("Segoe UI", 16, "bold"),
+            pady=20,
+        ).pack()
 
-        # Liste des livres
-        self.liste_livres = ttk.Treeview(self.tab_livres, columns=("Titre", "Auteur", "ISBN", "Statut"), show="headings")
-        for col in ("Titre", "Auteur", "ISBN", "Statut"):
-            self.liste_livres.heading(col, text=col)
-            self.liste_livres.column(col, width=150)
-        self.liste_livres.pack(fill="both", expand=True, padx=10, pady=10)
+        # --- Boutons gestion livres ---
+        ttk.Button(sidebar, text="Ajouter Livre", style="Sidebar.TButton",
+                   command=self.ajouter_livre).pack(fill="x", padx=20, pady=5)
 
+        ttk.Button(sidebar, text="Supprimer Livre", style="Sidebar.TButton",
+                   command=self.supprimer_livre).pack(fill="x", padx=20, pady=5)
+
+        ttk.Button(sidebar, text="Emprunter Livre", style="Sidebar.TButton",
+                   command=self.emprunter_livre).pack(fill="x", padx=20, pady=5)
+
+        ttk.Button(sidebar, text="Rendre Livre", style="Sidebar.TButton",
+                   command=self.rendre_livre).pack(fill="x", padx=20, pady=5)
+
+        # --- Boutons gestion utilisateurs ---
+        tk.Label(sidebar, text="Gestion Utilisateurs", bg="#1b1b1b",
+                 fg="white", font=("Segoe UI", 14, "bold"), pady=18).pack()
+
+        ttk.Button(sidebar, text="Ajouter Utilisateur", style="Sidebar.TButton",
+                   command=self.ajouter_user).pack(fill="x", padx=20, pady=5)
+
+        ttk.Button(sidebar, text="Supprimer Utilisateur", style="Sidebar.TButton",
+                   command=self.supprimer_user).pack(fill="x", padx=20, pady=5)
+
+        # -----------------------------------------------------
+        # MAIN AREA = Livres + Utilisateurs côte-à-côte
+        # -----------------------------------------------------
+        main = tk.Frame(self.root, bg="#121212")
+        main.pack(side="right", fill="both", expand=True)
+
+        # TABLE LIVRES
+        tk.Label(main, text="📚 Livres", bg="#121212", fg="white",
+                 font=("Segoe UI", 16)).pack(pady=10)
+
+        self.table_livres = ttk.Treeview(
+            main,
+            columns=("Titre", "Auteur", "Année", "Dispo"),
+            show="headings",
+        )
+        for col in ("Titre", "Auteur", "Année", "Dispo"):
+            self.table_livres.heading(col, text=col)
+            self.table_livres.column(col, anchor="center")
+
+        self.table_livres.pack(fill="both", expand=True, padx=20, pady=10)
+
+        # TABLE UTILISATEURS
+        tk.Label(main, text="👤 Utilisateurs", bg="#121212", fg="white",
+                 font=("Segoe UI", 16)).pack(pady=10)
+
+        self.table_users = ttk.Treeview(
+            main,
+            columns=("Nom", "Prénom", "ID", "Nb Emprunts"),
+            show="headings",
+        )
+        for col in ("Nom", "Prénom", "ID", "Nb Emprunts"):
+            self.table_users.heading(col, text=col)
+            self.table_users.column(col, anchor="center")
+
+        self.table_users.pack(fill="x", padx=20, pady=10)
+
+        # Dans create_layout(), après avoir créé les Treeview :
+        self.table_livres.bind("<<TreeviewSelect>>", self.on_select_livre)
+        self.table_users.bind("<<TreeviewSelect>>", self.on_select_user)
+
+    # ---------------------------------------------------------
+    # ÉVÉNEMENTS DE SÉLECTION
+    # ---------------------------------------------------------
+    def on_select_livre(self, event):
+        selection = self.table_livres.selection()
+        if selection:
+            item = self.table_livres.item(selection)["values"]
+            # print(f"📚 Livre sélectionné : {item}")
+
+    def on_select_user(self, event):
+        selection = self.table_users.selection()
+        if selection:
+            item = self.table_users.item(selection)["values"]
+            # print(f"👤 Utilisateur sélectionné : {item}")
+    # ---------------------------------------------------------
+    # REFRESH TABLES
+    # ---------------------------------------------------------
+    def refresh_livres(self):
+        for row in self.table_livres.get_children():
+            self.table_livres.delete(row)
+        for l in self.bib.livres:
+            self.table_livres.insert("", "end", values=(l.titre, l.auteur, l.annee,
+                                                          "Oui" if l.disponible else "Non"))
+
+    def refresh_users(self):
+        for row in self.table_users.get_children():
+            self.table_users.delete(row)
+        for u in self.bib.utilisateurs:
+            self.table_users.insert("", "end", values=(u.nom, u.prenom, u.identifiant,
+                                                         len(u.emprunts)))
+
+    # ---------------------------------------------------------
+    # POPUPS UTILES
+    # ---------------------------------------------------------
+    def popup(self, title, size="350x300"):
+        win = tk.Toplevel(self.root)
+        win.title(title)
+        win.geometry(size)
+        win.configure(bg="#1e1e1e")
+        win.grab_set()
+        return win
+
+    def input_field(self, parent, label):
+        tk.Label(parent, text=label, bg="#1e1e1e", fg="white",
+                 font=("Segoe UI", 11)).pack(pady=5)
+        entry = tk.Entry(parent, font=("Segoe UI", 12), relief="flat")
+        entry.pack(fill="x", padx=20)
+        return entry
+
+    # ---------------------------------------------------------
+    # 📚 GESTION DES LIVRES
+    # ---------------------------------------------------------
     def ajouter_livre(self):
-        titre = self.titre_entry.get()
-        auteur = self.auteur_entry.get()
-        isbn = self.isbn_entry.get()
-        if not titre or not auteur or not isbn:
-            messagebox.showwarning("Champs manquants", "Merci de remplir tous les champs.")
-            return
+        win = self.popup("Ajouter un Livre")
 
-        livre = Livre(titre, auteur, isbn)
-        self.biblio.ajouter_livre(livre)
-        self.mettre_a_jour_liste_livres()
-        self.titre_entry.delete(0, tk.END)
-        self.auteur_entry.delete(0, tk.END)
-        self.isbn_entry.delete(0, tk.END)
+        e_titre = self.input_field(win, "Titre :")
+        e_auteur = self.input_field(win, "Auteur :")
+        e_annee = self.input_field(win, "Année :")
 
-    def mettre_a_jour_liste_livres(self):
-        for row in self.liste_livres.get_children():
-            self.liste_livres.delete(row)
-        for livre in self.biblio.livres:
-            statut = "Disponible" if livre.disponible else "Emprunté"
-            self.liste_livres.insert("", "end", values=(livre.titre, livre.auteur, livre.isbn, statut))
+        def valider():
+            try:
+                livre = Livre(e_titre.get(), e_auteur.get(), int(e_annee.get()))
+                self.bib.ajouter_livre(livre)
+                self.refresh_livres()
+                win.destroy()
+            except:
+                messagebox.showerror("Erreur", "Données invalides")
 
-    # --- Onglet Utilisateurs ---
-    def create_tab_utilisateurs(self):
-        frame_ajout = ttk.LabelFrame(self.tab_utilisateurs, text="Ajouter un utilisateur")
-        frame_ajout.pack(fill="x", padx=10, pady=10)
+        ttk.Button(win, text="Ajouter", command=valider).pack(pady=15)
 
-        ttk.Label(frame_ajout, text="Nom:").grid(row=0, column=0, padx=5, pady=5)
-        ttk.Label(frame_ajout, text="Prénom:").grid(row=1, column=0, padx=5, pady=5)
-        ttk.Label(frame_ajout, text="ID:").grid(row=2, column=0, padx=5, pady=5)
+    def supprimer_livre(self):
+        try:
+            item = self.table_livres.item(self.table_livres.selection())["values"]
+            titre = item[0]
+            self.bib.supprimer_livre(titre)
+            self.refresh_livres()
+        except:
+            messagebox.showerror("Erreur", "Sélectionne un livre")
 
-        self.nom_entry = ttk.Entry(frame_ajout)
-        self.prenom_entry = ttk.Entry(frame_ajout)
-        self.id_entry = ttk.Entry(frame_ajout)
+    def emprunter_livre(self):
+        try:
+            print(self.table_livres.selection())
+            print(self.table_users.selection())
+            livre = self.table_livres.item(self.table_livres.selection())["values"][0]
+            user = self.table_users.item(self.table_users.selection())["values"][2]
+            self.bib.emprunter_livre(user, livre)
+            self.refresh_livres()
+            self.refresh_users()
+        except Exception as e:
+            messagebox.showerror("Erreur", str(e))
 
-        self.nom_entry.grid(row=0, column=1, padx=5, pady=5)
-        self.prenom_entry.grid(row=1, column=1, padx=5, pady=5)
-        self.id_entry.grid(row=2, column=1, padx=5, pady=5)
+    def rendre_livre(self):
+        try:
+            livre = self.table_livres.item(self.table_livres.selection())["values"][0]
+            user = self.table_users.item(self.table_users.selection())["values"][2]
+            self.bib.rendre_livre(user, livre)
+            self.refresh_livres()
+            self.refresh_users()
+        except:
+            messagebox.showerror("Erreur", "Sélectionne un utilisateur et un livre")
 
-        ttk.Button(frame_ajout, text="Ajouter", command=self.ajouter_utilisateur).grid(row=3, column=0, columnspan=2, pady=10)
+    # ---------------------------------------------------------
+    # 👤 GESTION DES UTILISATEURS
+    # ---------------------------------------------------------
+    def ajouter_user(self):
+        win = self.popup("Ajouter un Utilisateur")
 
-        # Liste des utilisateurs
-        self.liste_utilisateurs = ttk.Treeview(self.tab_utilisateurs, columns=("Nom", "Prénom", "ID"), show="headings")
-        for col in ("Nom", "Prénom", "ID"):
-            self.liste_utilisateurs.heading(col, text=col)
-            self.liste_utilisateurs.column(col, width=150)
-        self.liste_utilisateurs.pack(fill="both", expand=True, padx=10, pady=10)
+        e_nom = self.input_field(win, "Nom :")
+        e_prenom = self.input_field(win, "Prénom :")
+        e_id = self.input_field(win, "Identifiant :")
 
-    def ajouter_utilisateur(self):
-        nom = self.nom_entry.get()
-        prenom = self.prenom_entry.get()
-        identifiant = self.id_entry.get()
-        if not nom or not prenom or not identifiant:
-            messagebox.showwarning("Champs manquants", "Merci de remplir tous les champs.")
-            return
+        def valider():
+            user = Utilisateur(e_nom.get(), e_prenom.get(), e_id.get())
+            self.bib.ajouter_utilisateur(user)
+            self.refresh_users()
+            win.destroy()
 
-        user = Utilisateur(nom, prenom, identifiant)
-        self.biblio.ajouter_utilisateur(user)
-        self.mettre_a_jour_liste_utilisateurs()
-        self.nom_entry.delete(0, tk.END)
-        self.prenom_entry.delete(0, tk.END)
-        self.id_entry.delete(0, tk.END)
+        ttk.Button(win, text="Ajouter", command=valider).pack(pady=15)
 
-    def mettre_a_jour_liste_utilisateurs(self):
-        for row in self.liste_utilisateurs.get_children():
-            self.liste_utilisateurs.delete(row)
-        for user in self.biblio.utilisateurs:
-            self.liste_utilisateurs.insert("", "end", values=(user.nom, user.prenom, user.identifiant))
+    def supprimer_user(self):
+        try:
+            identifiant = self.table_users.item(self.table_users.selection())["values"][2]
+            self.bib.supprimer_utilisateur(identifiant)
+            self.refresh_users()
+        except:
+            messagebox.showerror("Erreur", "Sélectionne un utilisateur")
 
-    # --- Onglet Emprunts ---
-    def create_tab_emprunts(self):
-        frame_actions = ttk.LabelFrame(self.tab_emprunts, text="Gérer les emprunts")
-        frame_actions.pack(fill="x", padx=10, pady=10)
-
-        ttk.Label(frame_actions, text="ID Utilisateur:").grid(row=0, column=0, padx=5, pady=5)
-        ttk.Label(frame_actions, text="ISBN Livre:").grid(row=1, column=0, padx=5, pady=5)
-
-        self.id_emprunt_entry = ttk.Entry(frame_actions)
-        self.isbn_emprunt_entry = ttk.Entry(frame_actions)
-
-        self.id_emprunt_entry.grid(row=0, column=1, padx=5, pady=5)
-        self.isbn_emprunt_entry.grid(row=1, column=1, padx=5, pady=5)
-
-        ttk.Button(frame_actions, text="Emprunter", command=self.emprunter).grid(row=2, column=0, pady=10)
-        ttk.Button(frame_actions, text="Rendre", command=self.rendre).grid(row=2, column=1, pady=10)
-
-    def emprunter(self):
-        id_user = self.id_emprunt_entry.get()
-        isbn = self.isbn_emprunt_entry.get()
-        self.biblio.emprunter_livre(id_user, isbn)
-        self.mettre_a_jour_liste_livres()
-
-    def rendre(self):
-        id_user = self.id_emprunt_entry.get()
-        isbn = self.isbn_emprunt_entry.get()
-        self.biblio.retourner_livre(id_user, isbn)
-        self.mettre_a_jour_liste_livres()
+# (I will generate the full updated code including user management on your next instruction.)
