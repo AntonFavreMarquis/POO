@@ -66,14 +66,15 @@ class Bibliotheque:
         self.save()
 
     def supprimer_utilisateur(self, identifiant):
-        self.utilisateurs = [u for u in self.utilisateurs if u.identifiant != identifiant]
+        identifiant_norm = str(identifiant).strip().casefold()
+        self.utilisateurs = [u for u in self.utilisateurs if str(u.identifiant).strip().casefold() != identifiant_norm]
         self.save()
 
     def trouver_utilisateur(self, identifiant):
-        identifiant_norm = identifiant.strip().casefold()
+        identifiant_norm = str(identifiant).strip().casefold()
         for user in self.utilisateurs:
             print(f"[DEBUG USER] stocké='{user.identifiant}', recherche='{identifiant_norm}'")
-            if user.identifiant.strip().casefold() == identifiant_norm:
+            if str(user.identifiant).strip().casefold() == identifiant_norm:
                 return user
         return None
     # --- Emprunts ---

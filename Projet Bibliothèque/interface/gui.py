@@ -25,6 +25,7 @@ class InterfaceBibliotheque:
 
         self.refresh_livres()
         self.refresh_users()
+        self.refresh_emprunts()
 
         self.root.mainloop()
 
@@ -94,6 +95,9 @@ class InterfaceBibliotheque:
         ttk.Button(sidebar, text="Supprimer Utilisateur", style="Sidebar.TButton",
                    command=self.supprimer_user).pack(fill="x", padx=20, pady=5)
 
+        ttk.Button(sidebar, text="Voir Emprunts", style="Sidebar.TButton",
+                   command=self.voir_emprunts).pack(fill="x", padx=20, pady=5)
+
         # -----------------------------------------------------
         # MAIN AREA = Livres + Utilisateurs côte-à-côte
         # -----------------------------------------------------
@@ -130,24 +134,75 @@ class InterfaceBibliotheque:
 
         self.table_users.pack(fill="x", padx=20, pady=10)
 
+        # TABLE EMPRUNTS (LIVRES EMPRUNTÉS PAR UTILISATEUR)
+        tk.Label(main, text="📖 Emprunts par Utilisateur", bg="#121212", fg="white",
+                 font=("Segoe UI", 16)).pack(pady=10)
+
+        self.table_emprunts = ttk.Treeview(
+            main,
+            columns=("Utilisateur", "Nom", "Prénom", "Livre Emprunté"),
+            show="headings",
+        )
+        for col in ("Utilisateur", "Nom", "Prénom", "Livre Emprunté"):
+            self.table_emprunts.heading(col, text=col)
+            self.table_emprunts.column(col, anchor="center")
+
+        self.table_emprunts.pack(fill="both", expand=True, padx=20, pady=10)
+
         # Dans create_layout(), après avoir créé les Treeview :
         self.table_livres.bind("<<TreeviewSelect>>", self.on_select_livre)
         self.table_users.bind("<<TreeviewSelect>>", self.on_select_user)
+        self.table_livres.bind("<Button-1>", self.on_click_livre)
+        self.table_users.bind("<Button-1>", self.on_click_user)
+
+        # Variables pour traquer les sélections précédentes
+        self.last_selected_livre = None
+        self.last_selected_user = None
 
     # ---------------------------------------------------------
     # ÉVÉNEMENTS DE SÉLECTION
     # ---------------------------------------------------------
+    def on_click_livre(self, event):
+        # Identifier l'item cliqué
+        item_id = self.table_livres.identify_row(event.y)
+        
+        if item_id == self.last_selected_livre:
+            # Si c'est le même item, désélectionner
+            self.table_livres.selection_remove(item_id)
+            self.last_selected_livre = None
+        else:
+            # Sinon, sélectionner le nouvel item
+            self.last_selected_livre = item_id
+
+    def on_click_user(self, event):
+        # Identifier l'item cliqué
+        item_id = self.table_users.identify_row(event.y)
+        
+        if item_id == self.last_selected_user:
+            # Si c'est le même item, désélectionner
+            self.table_users.selection_remove(item_id)
+            self.last_selected_user = None
+        else:
+            # Sinon, sélectionner le nouvel item
+            self.last_selected_user = item_id
+
     def on_select_livre(self, event):
         selection = self.table_livres.selection()
         if selection:
-            item = self.table_livres.item(selection)["values"]
+            self.last_selected_livre = selection[0]
+            item = self.table_livres.item(selection)['values']
             # print(f"📚 Livre sélectionné : {item}")
+        else:
+            self.last_selected_livre = None
 
     def on_select_user(self, event):
         selection = self.table_users.selection()
         if selection:
-            item = self.table_users.item(selection)["values"]
+            self.last_selected_user = selection[0]
+            item = self.table_users.item(selection)['values']
             # print(f"👤 Utilisateur sélectionné : {item}")
+        else:
+            self.last_selected_user = None
     # ---------------------------------------------------------
     # REFRESH TABLES
     # ---------------------------------------------------------
@@ -164,6 +219,21 @@ class InterfaceBibliotheque:
         for u in self.bib.utilisateurs:
             self.table_users.insert("", "end", values=(u.nom, u.prenom, u.identifiant,
                                                          len(u.emprunts)))
+
+    def refresh_emprunts(self):
+        # Effacer le contenu actuel
+        for row in self.table_emprunts.get_children():
+            self.table_emprunts.delete(row)
+        
+        # Ajouter chaque emprunt
+        for user in self.bib.utilisateurs:
+            for livre_titre in user.emprunts:
+                self.table_emprunts.insert("", "end", values=(
+                    user.identifiant,
+                    user.nom, 
+                    user.prenom,
+                    livre_titre
+                ))
 
     # ---------------------------------------------------------
     # POPUPS UTILES
@@ -222,6 +292,7 @@ class InterfaceBibliotheque:
             self.bib.emprunter_livre(user, livre)
             self.refresh_livres()
             self.refresh_users()
+            self.refresh_emprunts()
         except Exception as e:
             messagebox.showerror("Erreur", str(e))
 
@@ -232,6 +303,7 @@ class InterfaceBibliotheque:
             self.bib.rendre_livre(user, livre)
             self.refresh_livres()
             self.refresh_users()
+            self.refresh_emprunts()
         except:
             messagebox.showerror("Erreur", "Sélectionne un utilisateur et un livre")
 
@@ -255,10 +327,66 @@ class InterfaceBibliotheque:
 
     def supprimer_user(self):
         try:
-            identifiant = self.table_users.item(self.table_users.selection())["values"][2]
+            selection = self.table_users.selection()
+            if not selection:
+                messagebox.showerror("Erreur", "Sélectionne un utilisateur")
+                return
+                
+            identifiant = self.table_users.item(selection[0])["values"][2]
+            
+            # Vérifier si l'utilisateur a des emprunts en cours
+            user = self.bib.trouver_utilisateur(identifiant)
+            if user and len(user.emprunts) > 0:
+                response = messagebox.askyesno(
+                    "Confirmation", 
+                    f"L'utilisateur {user.nom} {user.prenom} a {len(user.emprunts)} emprunt(s) en cours.\n"
+                    "Voulez-vous vraiment le supprimer? Les livres seront automatiquement rendus."
+                )
+                if not response:
+                    return
+                
+                # Rendre tous les livres empruntés avant de supprimer l'utilisateur
+                for livre_titre in user.emprunts.copy():
+                    try:
+                        self.bib.rendre_livre(identifiant, livre_titre)
+                    except:
+                        pass  # Ignorer les erreurs de retour
+            
+            # Supprimer l'utilisateur
             self.bib.supprimer_utilisateur(identifiant)
             self.refresh_users()
-        except:
-            messagebox.showerror("Erreur", "Sélectionne un utilisateur")
+            self.refresh_livres()
+            self.refresh_emprunts()
+            messagebox.showinfo("Succès", "Utilisateur supprimé avec succès")
+            
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur lors de la suppression: {str(e)}")
+    
+    def voir_emprunts(self):
+        """Afficher les emprunts de l'utilisateur sélectionné"""
+        try:
+            selection = self.table_users.selection()
+            if not selection:
+                messagebox.showerror("Erreur", "Sélectionne un utilisateur")
+                return
+                
+            identifiant = self.table_users.item(selection[0])["values"][2]
+            user = self.bib.trouver_utilisateur(identifiant)
+            
+            if not user:
+                messagebox.showerror("Erreur", "Utilisateur introuvable")
+                return
+            
+            if len(user.emprunts) == 0:
+                messagebox.showinfo("Emprunts", f"{user.nom} {user.prenom} n'a aucun emprunt en cours.")
+            else:
+                emprunts_text = "\n".join([f"• {livre}" for livre in user.emprunts])
+                messagebox.showinfo(
+                    "Emprunts", 
+                    f"Emprunts de {user.nom} {user.prenom}:\n\n{emprunts_text}"
+                )
+                
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Erreur: {str(e)}")
 
 # (I will generate the full updated code including user management on your next instruction.)
