@@ -16,7 +16,7 @@ class InterfaceBibliotheque:
         self.bib = Bibliotheque()
 
         self.root = tk.Tk()
-        self.root.title("📘 Bibliothèque Moderne")
+        self.root.title("📘 Bibliothèque")
         self.root.geometry("1100x650")
         self.root.configure(bg="#121212")
 
@@ -25,7 +25,6 @@ class InterfaceBibliotheque:
 
         self.refresh_livres()
         self.refresh_users()
-        self.refresh_emprunts()
 
         self.root.mainloop()
 
@@ -95,21 +94,36 @@ class InterfaceBibliotheque:
         ttk.Button(sidebar, text="Supprimer Utilisateur", style="Sidebar.TButton",
                    command=self.supprimer_user).pack(fill="x", padx=20, pady=5)
 
-        ttk.Button(sidebar, text="Voir Emprunts", style="Sidebar.TButton",
-                   command=self.voir_emprunts).pack(fill="x", padx=20, pady=5)
-
         # -----------------------------------------------------
         # MAIN AREA = Livres + Utilisateurs côte-à-côte
         # -----------------------------------------------------
         main = tk.Frame(self.root, bg="#121212")
         main.pack(side="right", fill="both", expand=True)
 
-        # TABLE LIVRES
-        tk.Label(main, text="📚 Livres", bg="#121212", fg="white",
-                 font=("Segoe UI", 16)).pack(pady=10)
+        # TABLE LIVRES avec barre de recherche
+        livres_frame = tk.Frame(main, bg="#121212")
+        livres_frame.pack(fill="both", expand=True, padx=20, pady=10)
+
+        tk.Label(livres_frame, text="📚 Livres", bg="#121212", fg="white",
+                 font=("Segoe UI", 16)).pack(pady=5)
+
+        # Barre de recherche livres
+        search_livres_frame = tk.Frame(livres_frame, bg="#121212")
+        search_livres_frame.pack(fill="x", pady=5)
+
+        tk.Label(search_livres_frame, text="🔍 Rechercher:", bg="#121212", fg="white",
+                 font=("Segoe UI", 10)).pack(side="left", padx=5)
+
+        self.search_livre_entry = tk.Entry(search_livres_frame, font=("Segoe UI", 11), relief="flat", bg="#2a2a2a",
+                                           fg="white")
+        self.search_livre_entry.pack(side="left", fill="x", expand=True, padx=5)
+        self.search_livre_entry.bind("<KeyRelease>", self.search_livres)
+
+        ttk.Button(search_livres_frame, text="✖ Effacer", style="Sidebar.TButton",
+                   command=self.clear_search_livres).pack(side="left", padx=5)
 
         self.table_livres = ttk.Treeview(
-            main,
+            livres_frame,
             columns=("Titre", "Auteur", "Année", "Dispo"),
             show="headings",
         )
@@ -117,14 +131,32 @@ class InterfaceBibliotheque:
             self.table_livres.heading(col, text=col)
             self.table_livres.column(col, anchor="center")
 
-        self.table_livres.pack(fill="both", expand=True, padx=20, pady=10)
+        self.table_livres.pack(fill="both", expand=True)
 
-        # TABLE UTILISATEURS
-        tk.Label(main, text="👤 Utilisateurs", bg="#121212", fg="white",
-                 font=("Segoe UI", 16)).pack(pady=10)
+        # TABLE UTILISATEURS avec barre de recherche
+        users_frame = tk.Frame(main, bg="#121212")
+        users_frame.pack(fill="x", padx=20, pady=10)
+
+        tk.Label(users_frame, text="👤 Utilisateurs", bg="#121212", fg="white",
+                 font=("Segoe UI", 16)).pack(pady=5)
+
+        # Barre de recherche utilisateurs
+        search_users_frame = tk.Frame(users_frame, bg="#121212")
+        search_users_frame.pack(fill="x", pady=5)
+
+        tk.Label(search_users_frame, text="🔍 Rechercher:", bg="#121212", fg="white",
+                 font=("Segoe UI", 10)).pack(side="left", padx=5)
+
+        self.search_user_entry = tk.Entry(search_users_frame, font=("Segoe UI", 11), relief="flat", bg="#2a2a2a",
+                                          fg="white")
+        self.search_user_entry.pack(side="left", fill="x", expand=True, padx=5)
+        self.search_user_entry.bind("<KeyRelease>", self.search_users)
+
+        ttk.Button(search_users_frame, text="✖ Effacer", style="Sidebar.TButton",
+                   command=self.clear_search_users).pack(side="left", padx=5)
 
         self.table_users = ttk.Treeview(
-            main,
+            users_frame,
             columns=("Nom", "Prénom", "ID", "Nb Emprunts"),
             show="headings",
         )
@@ -132,22 +164,8 @@ class InterfaceBibliotheque:
             self.table_users.heading(col, text=col)
             self.table_users.column(col, anchor="center")
 
-        self.table_users.pack(fill="x", padx=20, pady=10)
+        self.table_users.pack(fill="x")
 
-        # TABLE EMPRUNTS (LIVRES EMPRUNTÉS PAR UTILISATEUR)
-        tk.Label(main, text="📖 Emprunts par Utilisateur", bg="#121212", fg="white",
-                 font=("Segoe UI", 16)).pack(pady=10)
-
-        self.table_emprunts = ttk.Treeview(
-            main,
-            columns=("Utilisateur", "Nom", "Prénom", "Livre Emprunté"),
-            show="headings",
-        )
-        for col in ("Utilisateur", "Nom", "Prénom", "Livre Emprunté"):
-            self.table_emprunts.heading(col, text=col)
-            self.table_emprunts.column(col, anchor="center")
-
-        self.table_emprunts.pack(fill="both", expand=True, padx=20, pady=10)
 
         # Dans create_layout(), après avoir créé les Treeview :
         self.table_livres.bind("<<TreeviewSelect>>", self.on_select_livre)
@@ -158,6 +176,9 @@ class InterfaceBibliotheque:
         # Variables pour traquer les sélections précédentes
         self.last_selected_livre = None
         self.last_selected_user = None
+
+        ttk.Button(sidebar, text="Détails Utilisateur", style="Sidebar.TButton",
+                   command=self.open_user_details).pack(fill="x", padx=20, pady=5)
 
     # ---------------------------------------------------------
     # ÉVÉNEMENTS DE SÉLECTION
@@ -220,20 +241,6 @@ class InterfaceBibliotheque:
             self.table_users.insert("", "end", values=(u.nom, u.prenom, u.identifiant,
                                                          len(u.emprunts)))
 
-    def refresh_emprunts(self):
-        # Effacer le contenu actuel
-        for row in self.table_emprunts.get_children():
-            self.table_emprunts.delete(row)
-        
-        # Ajouter chaque emprunt
-        for user in self.bib.utilisateurs:
-            for livre_titre in user.emprunts:
-                self.table_emprunts.insert("", "end", values=(
-                    user.identifiant,
-                    user.nom, 
-                    user.prenom,
-                    livre_titre
-                ))
 
     # ---------------------------------------------------------
     # POPUPS UTILES
@@ -292,7 +299,6 @@ class InterfaceBibliotheque:
             self.bib.emprunter_livre(user, livre)
             self.refresh_livres()
             self.refresh_users()
-            self.refresh_emprunts()
         except Exception as e:
             messagebox.showerror("Erreur", str(e))
 
@@ -303,7 +309,6 @@ class InterfaceBibliotheque:
             self.bib.rendre_livre(user, livre)
             self.refresh_livres()
             self.refresh_users()
-            self.refresh_emprunts()
         except:
             messagebox.showerror("Erreur", "Sélectionne un utilisateur et un livre")
 
@@ -356,7 +361,6 @@ class InterfaceBibliotheque:
             self.bib.supprimer_utilisateur(identifiant)
             self.refresh_users()
             self.refresh_livres()
-            self.refresh_emprunts()
             messagebox.showinfo("Succès", "Utilisateur supprimé avec succès")
             
         except Exception as e:
@@ -389,4 +393,138 @@ class InterfaceBibliotheque:
         except Exception as e:
             messagebox.showerror("Erreur", f"Erreur: {str(e)}")
 
-# (I will generate the full updated code including user management on your next instruction.)
+    # ---------------------------------------------------------
+    # 🔍 FONCTIONNALITÉS DE RECHERCHE
+    # ---------------------------------------------------------
+    def search_livres(self, event=None):
+        """Filtrer les livres en fonction de la recherche"""
+        search_term = self.search_livre_entry.get().strip().lower()
+
+        # Effacer la table
+        for row in self.table_livres.get_children():
+            self.table_livres.delete(row)
+
+        # Filtrer et afficher
+        for l in self.bib.livres:
+            # Recherche dans titre, auteur ou année
+            if (search_term in l.titre.lower() or
+                    search_term in l.auteur.lower() or
+                    search_term in str(l.annee)):
+                self.table_livres.insert("", "end", values=(
+                    l.titre, l.auteur, l.annee,
+                    "Oui" if l.disponible else "Non"
+                ))
+
+    def clear_search_livres(self):
+        """Effacer la recherche et réafficher tous les livres"""
+        self.search_livre_entry.delete(0, tk.END)
+        self.refresh_livres()
+
+    def search_users(self, event=None):
+        """Filtrer les utilisateurs en fonction de la recherche"""
+        search_term = self.search_user_entry.get().strip().lower()
+
+        # Effacer la table
+        for row in self.table_users.get_children():
+            self.table_users.delete(row)
+
+        # Filtrer et afficher
+        for u in self.bib.utilisateurs:
+            # Recherche dans nom, prénom ou identifiant
+            if (search_term in u.nom.lower() or
+                    search_term in u.prenom.lower() or
+                    search_term in str(u.identifiant).lower()):
+                self.table_users.insert("", "end", values=(
+                    u.nom, u.prenom, u.identifiant,
+                    len(u.emprunts)
+                ))
+
+    def clear_search_users(self):
+        """Effacer la recherche et réafficher tous les utilisateurs"""
+        self.search_user_entry.delete(0, tk.END)
+        self.refresh_users()
+
+    # ---------------------------------------------------------
+    # Pop UP USER pour gestion d'emprunts
+    # ---------------------------------------------------------
+    def open_user_details(self):
+        """Popup affichant les emprunts + dates + bouton pour rendre un livre"""
+
+        # Vérifier sélection utilisateur
+        selection = self.table_users.selection()
+        if not selection:
+            messagebox.showerror("Erreur", "Sélectionne un utilisateur")
+            return
+
+        identifiant = self.table_users.item(selection[0])["values"][2]
+        user = self.bib.trouver_utilisateur(identifiant)
+
+        if not user:
+            messagebox.showerror("Erreur", "Utilisateur introuvable")
+            return
+
+        # --- FENÊTRE POPUP ---
+        win = tk.Toplevel(self.root)
+        win.title(f"Emprunts de {user.prenom} {user.nom}")
+        win.geometry("550x500")
+        win.configure(bg="#1e1e1e")
+        win.grab_set()
+
+        # Titre
+        tk.Label(
+            win,
+            text=f"📖 Emprunts de {user.prenom} {user.nom}",
+            bg="#1e1e1e",
+            fg="white",
+            font=("Segoe UI", 16, "bold")
+        ).pack(pady=15)
+
+        # TABLE
+        table = ttk.Treeview(
+            win,
+            columns=("Livre", "Date Fin"),
+            show="headings",
+            height=10
+        )
+
+        table.heading("Livre", text="Livre")
+        table.heading("Date Fin", text="Date de Retour")
+
+        table.column("Livre", anchor="center", width=230)
+        table.column("Date Fin", anchor="center", width=140)
+
+        table.pack(fill="both", expand=True, padx=20, pady=10)
+
+        # Remplir la table directement avec emprunts_detailles
+        for emp in user.emprunts_detailles:
+            table.insert("", "end", values=(emp["titre"], emp["date_fin"]))
+
+        # --- Bouton rendre ---
+        def rendre_selection():
+            try:
+                selection = table.selection()
+                if not selection:
+                    messagebox.showerror("Erreur", "Sélectionne un emprunt dans la liste")
+                    return
+
+                emprunt_values = table.item(selection[0])["values"]
+                titre = emprunt_values[0]
+
+                self.bib.rendre_livre(user.identifiant, titre)
+
+                # Refresh interface principale
+                self.refresh_livres()
+                self.refresh_users()
+
+                # Refresh popup table (user.emprunts_detailles est déjà à jour après rendre_livre)
+                table.delete(*table.get_children())
+                for emp in user.emprunts_detailles:
+                    table.insert("", "end", values=(emp["titre"], emp["date_fin"]))
+
+                messagebox.showinfo("Succès", f"Le livre '{titre}' a été rendu.")
+
+            except Exception as e:
+                messagebox.showerror("Erreur", str(e))
+
+        ttk.Button(win, text="Rendre le livre sélectionné", command=rendre_selection).pack(pady=15)
+

@@ -8,6 +8,7 @@ import os
 from models.livre import Livre
 from models.user import Utilisateur
 
+
 class Bibliotheque:
     def __init__(self, fichier="bibliotheque.json"):
         self.fichier = fichier
@@ -77,8 +78,10 @@ class Bibliotheque:
             if str(user.identifiant).strip().casefold() == identifiant_norm:
                 return user
         return None
+
     # --- Emprunts ---
     def emprunter_livre(self, identifiant_user, titre):
+        from datetime import datetime, timedelta
         print(identifiant_user, titre)
         utilisateur = self.trouver_utilisateur(identifiant_user)
         livre = self.trouver_livre(titre)
@@ -89,7 +92,8 @@ class Bibliotheque:
             print("Livre déjà emprunté")
             raise Exception("Livre déjà emprunté")
         livre.disponible = False
-        utilisateur.emprunts.append(livre.titre)
+        date_fin = (datetime.now() + timedelta(days=14)).strftime("%d/%m/%Y")
+        utilisateur.add_emprunt(livre.titre, date_fin)
         self.save()
 
     def rendre_livre(self, identifiant, titre):
@@ -100,5 +104,10 @@ class Bibliotheque:
         if titre not in utilisateur.emprunts:
             raise Exception("Ce livre n'est pas emprunté par cet utilisateur")
         livre.disponible = True
-        utilisateur.emprunts.remove(titre)
+        utilisateur.remove_emprunt(titre)  # ← CHANGEMENT : utilise remove_emprunt au lieu de .remove()
         self.save()
+
+    def emprunts_utilisateur_details(self, user):
+        # ← CHANGEMENT : retourne directement emprunts_detailles qui contient déjà titre et date_fin
+        return user.emprunts_detailles
+
